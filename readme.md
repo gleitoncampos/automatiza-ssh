@@ -10,9 +10,9 @@ Com os 2 playbooks aqui disponibilizados, basta preencher as variaveis no arqivo
 5. Fornecer os arquivos de chave publica devidamente nomeados como *nome_do_usuario.pub* e colocados dentro das devidas pastas;
 6. Executar o Ansble:
     ``` 
-    ansible-playbook -i hosts.yaml ./create-user/ssh-adduser.yaml
+    ansible-playbook -i hosts.yaml ssh-adduser.yaml
     ```
     ou
     
     ```
-    ansible-playbook -i hosts.yaml ./remove-user/ssh-deluser.yaml
+    ansible-playbook -i hosts.yaml ssh-deluser.yaml
