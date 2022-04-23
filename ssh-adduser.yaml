@@ -1,0 +1,47 @@
+---
+- name: Criando novos usuarios para uso via SSH
+  hosts: grupo1
+  become: yes
+  gather_facts: false
+  vars_files:
+    - ./vars.yaml
+
+  tasks: 
+      - name: Criando o usuário
+        user:
+          name: "{{ item.name }}"
+          password: "{{ lookup('password', '/dev/null chars=ascii_letters,digits,hexdigits,punctuation length=16') | password_hash('sha512') }}"
+          groups: "{{ item.groups }}"
+          shell: "{{ item.shell }}"
+          state: present
+        with_items: "{{ users_list }}"
+
+      - name: Adicionando a chave publica no authorized_keys
+        authorized_key:
+          user: "{{ item.name }}"
+          state: present
+          key: "{{ lookup('file', './{{ item.name }}.pub') }}"
+        with_items: "{{ users_list }}"
+
+      - name: Permitindo que o usuario criado possa logar via SSH
+        ansible.builtin.lineinfile:
+          dest: /etc/ssh/sshd_config
+          line: 'AllowUsers {{ item.name }}'
+          state: present
+        with_items: "{{ users_list }}"
+
+      - name: Verificando se o usuario foi adicionado ao sudo
+        getent:
+          database: group
+          key: sudo
+        register: result
+
+      - name: Adicionando usuario ao grupo de sudoers sem password
+        ansible.builtin.lineinfile:
+          path: /etc/sudoers
+          regexp: '^{{ item.name }}'
+          line: '{{ item.name }} ALL=(ALL) NOPASSWD: ALL'
+          validate: 'visudo -cf %s'
+          state: present
+        with_items: "{{ users_list }}"
+        when: item.name in result.ansible_facts.getent_group.sudo[2]

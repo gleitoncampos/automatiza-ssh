@@ -1,0 +1,49 @@
+---
+- name: Removendo acesso de usuario ao SSH
+  hosts: grupo1
+  become: yes
+  gather_facts: false
+  vars_files:
+    - ./vars.yaml
+  tasks:
+      - name: Encerrando processos dos usuarios a serem removidos
+        command: skill -u {{ item.name }}
+        with_items: "{{ users_list }}"
+
+      - name: Removendo chave publica do usuario da lista de authorized_keys
+        authorized_key:
+          user: "{{ item.name }}"
+          state: absent
+          key: "{{ lookup('file', './{{ item.name }}.pub') }}" 
+        with_items: "{{ users_list }}"
+
+      - name: Negando que o usuario possa logar via SSH
+        ansible.builtin.lineinfile:
+          dest: /etc/ssh/sshd_config
+          regexp: '^AllowUsers'
+          line: 'AllowUsers {{ item.name }}'
+          state: absent
+        with_items: "{{ users_list }}"
+
+      - name: Verificando se o usuario pertence ao grupo sudo
+        getent:
+          database: group
+          key: sudo
+        register: result
+
+      - name: Removendo usuario do grupo de sudoers sem password
+        ansible.builtin.lineinfile:
+          path: /etc/sudoers
+          regexp: '^{{ item.name }}'
+          line: '{{ item.name }} ALL=(ALL) NOPASSWD: ALL'
+          validate: 'visudo -cf %s'
+          state: absent
+        with_items: "{{ users_list }}"
+        when: item.name in result.ansible_facts.getent_group.sudo[2]
+
+      - name: Removendo o usuário
+        user:
+          name: "{{ item.name }}"
+          groups: "{{ item.groups }}"
+          state: absent
+        with_items: "{{ users_list }}"
